@@ -1,0 +1,169 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  NO_PROXY: "gitlab.cha.rbxd.ds"
+  DOCKER_HOST: tcp://127.0.0.1:2375
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_DRIVER: overlay2
+  npm_config_cache: '$CI_PROJECT_DIR/.npm'
+  FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "true"
+  ENV: 'performance'
+  RATE: '10'
+  NOTIFY: 'false'
+
+.docker_runner_image: &docker_runner_image
+  image:
+    name: artifacts.cha.rbxd.ds/docker:dind-v3
+  variables:
+    DOCKER_HOST: tcp://localhost:2375
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  tags:
+    - k8s-cha-v2
+  services:
+  - name: ${DOCKER_REGISTRY_CHA}/gitlab/dind-aws-cli:latest-compose
+    entrypoint: ["env", "-u", "DOCKER_HOST"]
+    command:
+      - /bin/sh
+      - -c
+      - dockerd-entrypoint.sh || exit
+
+.docker_curl_runner_image: &docker_curl_runner_image
+  image:
+    name: ${DOCKER_REGISTRY_CHA}/alpine/curl-jq:3.14
+  tags:
+    - k8s-cha-v2
+
+stages:
+  - test
+  - notify
+  - validate
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cache/*
+    - node_modules
+
+Run performance test suite:      
+  <<: *docker_runner_image
+  stage: test
+  tags:
+    - k8s-cha-v2
+  script:
+    - echo "Running Performance Load Tests On :$ENV with rate :$RATE"
+    - chmod +x ./docker-run-k6-load.sh
+    - ./docker-run-k6-load.sh $ENV $RATE
+    - echo "Run performance test suite completed" > ./performance_test_completed
+  after_script:
+    - echo "JOB_STATUS=${CI_JOB_STATUS:-success}" >> test_results.env
+    - echo "The status of the pipeline is:" $CI_PIPELINE_STATUS
+    - echo "JOB_ID=$CI_JOB_ID" >> test_results.env
+    - if [[ $CI_JOB_STATUS == "success" ]]; then
+        echo "The Automation Test cases got passed!";
+        echo "JOB_STATUS=${CI_JOB_STATUS:-success}" >> test_results.env
+        echo "JOB_ID=$CI_JOB_ID" >> test_results.env
+      else
+        echo "The Automation Test cases got failed!";
+        echo "JOB_STATUS=${CI_JOB_STATUS:-failed}" >> test_results.env
+        echo "JOB_ID=$CI_JOB_ID" >> test_results.env
+      fi
+  artifacts:
+    when: always
+    paths:
+      - results/
+      - ./performance_test_completed
+    expire_in: 15 day
+    reports:
+      dotenv: test_results.env
+  allow_failure: true
+   
+
+Notify on teams channel:
+  <<: *docker_curl_runner_image
+  needs: [Run performance test suite]
+  stage: notify
+  tags:
+    - k8s-cha-v2
+  script:
+    - |
+      if [[ "$JOB_STATUS" == "success" ]]; then
+        themeColor="52eb34"  # Green color for success
+      else
+        themeColor="eb3434"  # Red color for failure
+      fi
+      curl -X POST -H "Content-Type: application/json" -d '{
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "themeColor": "'"$themeColor"'",
+        "summary": "Video Capability",
+        "sections": [{
+          "activityTitle": "Workflow - API Performance Load Test Results",
+          "activitySubtitle": "Content Convergence",
+          "activityImage": "https://www.icis.com/explore/wp-content/themes/icis-2020/assets/images/footer-logo.png",
+          "facts": [{
+            "name": "Project",
+            "value": "'"$CI_PROJECT_NAME"'"
+          }, {
+            "name": "Branch",
+            "value": "'"$CI_COMMIT_BRANCH"'"
+          }, {
+            "name": "Environment",
+            "value": "'"$ENV"'"
+          },{
+            "name": "Status",
+            "value": "'"$JOB_STATUS"'"
+          },{
+            "name": "Author",
+            "value": "'"$GITLAB_USER_NAME"'"
+          }],
+          "markdown": true
+        }],
+        "potentialAction": [{
+          "@type": "OpenUri",
+          "name": "Download Start-Workflow-API Report",
+          "targets": [{
+            "os": "default",
+            "uri": "https://gitlab.cha.rbxd.ds/icis/workflow/automation-test-suite/workflow-api-load-test-suite/-/jobs/'"$JOB_ID"'/artifacts/file/results/startWorkflowApi.html"
+          }]
+          },{
+          "@type": "OpenUri",
+          "name": "Download Workflow-Status-API Report",
+          "targets": [{
+            "os": "default",
+            "uri": "https://gitlab.cha.rbxd.ds/icis/workflow/automation-test-suite/workflow-api-load-test-suite/-/jobs/'"$JOB_ID"'/artifacts/file/results/workflowStatusApi.html"
+          }]
+          },{
+          "@type": "OpenUri",
+          "name": "Download Workflow-StageInfo-API Report",
+          "targets": [{
+            "os": "default",
+            "uri": "https://gitlab.cha.rbxd.ds/icis/workflow/automation-test-suite/workflow-api-load-test-suite/-/jobs/'"$JOB_ID"'/artifacts/file/results/workflowStageInfoApi.html"
+          }]
+        }, {
+          "@type": "OpenUri",
+          "name": "Download Workflow-Complete-Task-API Report",
+          "targets": [{
+            "os": "default",
+            "uri": "https://gitlab.cha.rbxd.ds/icis/workflow/automation-test-suite/workflow-api-load-test-suite/-/jobs/'"$JOB_ID"'/artifacts/file/results/workflowCompleteTaskApi.html"
+          }]
+        }]
+      }' $TEAMS_WEBHOOK_URL
+  dependencies:
+    - Run performance test suite
+  rules:
+    - if: '$NOTIFY == "true"'
+
+Verify jobs: 
+  stage: validate 
+  tags:
+    - k8s-cha-v2
+  script: 
+    - |
+      if [[ -f ./performance_test_completed ]]; then
+      echo "Run performance test suite completed."
+      else
+      echo "Run performance test suite was not completed."
+      exit 1
+      fi
+  dependencies:
+    - Run performance test suite

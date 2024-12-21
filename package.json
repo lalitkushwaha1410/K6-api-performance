@@ -1,0 +1,41 @@
+{
+  "name": "api-performance-load-test-suite",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "install-windows": "choco install k6 && echo 'you need admin'",
+    "run:nodemagic": "node ./src/javascripts/handleReport.js",
+    "build": "yarn webpack",
+    "run:startWorkflowApi": "k6 run --summary-trend-stats=\"avg,min,max,med,p(90),p(95),p(99)\" dist/startWorkflowApi.js --insecure-skip-tls-verify",
+    "run:workflowStatusApi": "k6 run --summary-trend-stats=\"avg,min,max,med,p(90),p(95),p(99)\" dist/workflowStatusApi.js --insecure-skip-tls-verify",
+    "run:workflowStageInfoApi": "k6 run --summary-trend-stats=\"avg,min,max,med,p(90),p(95),p(99)\" dist/workflowStageInfoApi.js --insecure-skip-tls-verify",
+    "run:workflowCompleteTaskApi": "k6 run --summary-trend-stats=\"avg,min,max,med,p(90),p(95),p(99)\" dist/workflowCompleteTaskApi.js --insecure-skip-tls-verify",
+    "run:load": "yarn webpack && (yarn run:startWorkflowApi &&  yarn run:workflowCompleteTaskApi)",
+    "run:all": "yarn build && k6 run dist/combinedWorkflowApi.js --insecure-skip-tls-verify"
+  },
+  "dependencies": {
+    "@babel/core": "7.13.16",
+    "@babel/plugin-proposal-class-properties": "7.13.0",
+    "@babel/plugin-proposal-object-rest-spread": "7.13.8",
+    "@babel/preset-env": "7.13.15",
+    "@babel/preset-typescript": "7.13.0",
+    "@types/k6": "^0.37.0",
+    "@types/webpack": "5.28.0",
+    "babel-loader": "8.2.2",
+    "browserify": "^17.0.0",
+    "form-data": "^4.0.0",
+    "k6": "^0.0.0",
+    "typescript": "4.2.4",
+    "uuid": "3.4.0",
+    "webpack": "5.94.0",
+    "webpack-node-externals": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "clean-webpack-plugin": "4.0.0-alpha.0",
+    "fast-csv": "^4.3.6",
+    "findit": "^2.0.0",
+    "webpack-cli": "4.6.0"
+  }
+}

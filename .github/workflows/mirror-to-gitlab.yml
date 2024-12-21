@@ -1,0 +1,21 @@
+name: GitLab Mirror
+on:
+  # Triggers the workflow on push or pull request events on all branches
+  push:
+    branches: [ "main", "**" ]
+    tags: [ "**" ]
+  pull_request:
+    branches: [ "main", "**" ]
+    tags: [ "**" ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  mirror_to_gitlab_from_resuable_workflow:
+    name: Mirror
+    uses: LexisNexis-RBA/dsg-icis-github-mirror-action/.github/workflows/gitlab_mirror_workflow.yaml@main
+  #  uses: ./.github/workflows/reusableworkflow.yaml
+    secrets: inherit
+    with:
+      gitlab_project_path: git@gitlab.cha.rbxd.ds:icis/workflow/automation-test-suite/workflow-api-load-test-suite.git
+

@@ -1,0 +1,123 @@
+<html>
+
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.2.1/echarts.min.js"></script>
+</head>
+
+<body>
+  <div id="main" style="width: 600px;height:400px;"></div>
+  <script>
+    var seriesData = replaceMe;
+    var myChart = echarts.init(document.getElementById('main'));
+    const seriesList = [];
+    const vuData = seriesData.vus.map(x => parseFloat(x));
+    let maxTop = -1;
+    maxTop = Math.max(...vuData);
+
+    const lastBar = {
+      name: 'Vus',
+      type: 'bar',
+      stack: 'Vus',
+      emphasis: {
+        focus: 'series'
+      },
+      data: vuData
+    }
+
+    const responseData = seriesData.response.map(x => parseFloat(x));
+    const responseMin = Math.min(...responseData);
+    const responseMax = Math.max(...responseData);
+
+    const responseLine = {
+      name: 'response',
+      type: 'line',
+      stack: 'response',
+      emphasis: {
+        focus: 'series'
+      },
+      data: responseData,
+      yAxisIndex: 1,
+    }
+    for (const property in seriesData) {
+      if (property !== 'xaxis' && property !== 'response' && property !== 'vus') {
+        const data = seriesData[property];
+        const tempMaxTop = Math.max(...data);
+        if (tempMaxTop > maxTop) {
+          maxTop = tempMaxTop;
+        }
+        const bar = {
+          name: property,
+          type: 'bar',
+          stack: 'Data',
+          emphasis: {
+            focus: 'series'
+          },
+          data: data
+        }
+        seriesList.push(bar)
+      }
+    }
+    seriesList.push(lastBar);
+    seriesList.push(responseLine);
+    option = {
+      title: {
+        text: 'replaceFileName',
+      },
+      dataZoom: [{
+          type: 'slider'
+        },
+        {
+          type: 'inside'
+        }
+      ],
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'shadow'
+        }
+      },
+      legend: {
+        y: 20
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+      },
+      xAxis: [{
+        type: 'category',
+        data: seriesData.xaxis.map(x => parseFloat(x)),
+        axisLabel: {
+          formatter: function (value) {
+            return echarts.format.formatTime('hh:mm:ss', new Date(parseInt(value) * 1000));
+          }
+        }
+      }],
+      yAxis: [{
+          min: 0,
+          max: maxTop,
+          position: 'right',
+          axisLine: {
+            show: true,
+          },
+        },
+        {
+          name: 'Times',
+          min: responseMin,
+          max: responseMax,
+          position: 'left',
+          axisLine: {
+            show: true,
+          },
+        }
+      ],
+      series: seriesList
+    };
+
+    myChart.setOption(option);
+
+  </script>
+</body>
+
+</html>

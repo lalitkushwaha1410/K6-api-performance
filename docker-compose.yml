@@ -1,0 +1,14 @@
+version: "3.4"
+
+services:
+  perf-load-tests:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: Base
+    command: yarn run:all
+    container_name: workflow-performance-test-load
+    volumes:
+      - type: bind
+        source: ./results
+        target: /app/api-performance-load-test-suite/results
